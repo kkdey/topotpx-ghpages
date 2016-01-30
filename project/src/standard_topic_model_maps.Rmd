@@ -2,7 +2,10 @@
 title: "Topic model on Maps"
 author: "Kushal K Dey"
 date: "January 30, 2016"
-output: html_document
+output: 
+  html_document:
+    css: floating-toc.css
+    toc: true
 ---
 
 ## Overview 
