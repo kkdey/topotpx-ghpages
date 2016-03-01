@@ -1,0 +1,156 @@
+---
+title: 'Topic model on Maps: Abundance'
+author: "Kushal K Dey"
+date: "February 29, 2016"
+output: html_document
+---
+
+## Overview 
+
+We read the map data into R. This map data is created by vectorizing the maps provided in the the directory `../external_data/Dispersion_Fields_with_Abundance` and then stacking these vectors in each row to get a counts data matrix of forest spots by number of cells, with the entries representing the number of distinct species of the forest spot that are present in that cell.
+
+To see how this data was created, check the R script `../R/create_mapdata.R`.
+
+```{r echo=TRUE, eval=TRUE}
+rm(list=ls())
+library(data.table)
+#install_github('kkdey/maptpx') 
+library(maptpx)
+library(CountClust)
+library(data.table)
+library(lattice)
+```
+
+## Loading map data
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+map_data <- data.frame(fread('../external_data/map_data_abundance.txt'));
+rownames(map_data) <- map_data[,1]
+map_data <- map_data[,-1]
+```
+
+## Data Visualization
+
+We plot the map for one of the forest spots.
+
+```{r echo=TRUE, eval=TRUE}
+N=360;
+M=560;
+lat <- rep(1:N, M);
+long <- rep(1:M, each=N)
+
+levelplot(map_data[1,] ~ lat*long) 
+levelplot(map_data[20,] ~ lat*long) 
+
+
+```
+
+## Loading metadata
+
+The metadata rows are arranged in the same order as in the data (checked).
+
+```{r echo=TRUE, eval=TRUE}
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE);
+elevation_metadata=metadata$Elevation;
+
+east_west_dir = metadata$WorE;
+
+```
+
+## Topic model fit (K=2)
+
+### Model
+
+```{r echo=TRUE, eval=FALSE}
+nclus_vec <- 2:5;
+for(k in 1:length(nclus_vec))
+{
+  Topic_clus <- topics(map_data, nclus_vec[k], tol=0.1);
+  saveRDS(Topic_clus, paste0("../rdas/topic_clus_", nclus_vec[k],"_maps_abundance.rds"));
+}
+```
+
+```{r echo=TRUE, eval=TRUE}
+Topic_clus <- readRDS("../rdas/topic_clus_2_maps_abundance.rds")
+docweights <- Topic_clus$omega;
+topics_theta <- Topic_clus$theta;
+```
+
+### Structure Plot (elevation)
+
+```{r echo=TRUE, eval=TRUE}
+K <- 2
+barplot(t(Topic_clus$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+```
+
+### Interpreting the clusters
+
+We now plot the maps for the two clusters we obtain. One would represent the dispersion field for the lower elevation cluster, while the other would represent dispersion field for higher elevation lcuster.
+
+```{r echo=TRUE, eval=TRUE}
+topics_theta <- Topic_clus$theta;
+levelplot(topics_theta[,1] ~ lat*long) 
+levelplot(topics_theta[,2] ~ lat*long) 
+
+```
+
+## Topic model fit (K=3)
+
+### Model
+
+```{r echo=TRUE, eval=TRUE}
+Topic_clus <- readRDS("../rdas/topic_clus_3_maps_abundance.rds")
+docweights <- Topic_clus$omega;
+topics_theta <- Topic_clus$theta;
+```
+
+### Structure Plot (Elevation and E/W)
+
+```{r echo=TRUE, eval=TRUE}
+east_west_elevation = paste0(metadata$WorE, "_", metadata$Elevation);
+
+index1 <- which(metadata$WorE=="E");
+index2 <- which(metadata$WorE=="W");
+elevation1 <- metadata$Elevation[index1]; elevation2 <- metadata$Elevation[index2];
+index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
+
+  K <- 3
+    barplot(t(docweights[index_WE,]),col=2:(K+1),axisnames=F,space=0,border=NA,main=paste("No. of clusters=",3),las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+
+    combo_patch_dir = paste0(east_west_elevation);
+    combo_patch_dir_ordered = combo_patch_dir[index_WE];
+
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+```
+
+### Interpreting the clusters
+
+```{r echo=TRUE, eval=TRUE}
+topics_theta <- Topic_clus$theta;
+levelplot(topics_theta[,1] ~ lat*long) 
+levelplot(topics_theta[,2] ~ lat*long) 
+levelplot(topics_theta[,3] ~ lat*long) 
+```
+
+## Conclusion
+
+It appears from fitting standard topic model on maps that elevation is the biggest driving cluster for $K=2$. For $K=3$, slightly higher proportion of blue cluster is seen at lower elevations of West compared to lower elevations of East. Also the green cluster is less prominent in the western sites compared to the eastern sites. These plots need to be compared with the original analysis on the forest spots against bird species. 
+

@@ -1,0 +1,259 @@
+---
+title: "DAPC on Himalayan Birds data"
+author: "Kushal K Dey"
+date: "February 29, 2016"
+output: 
+  html_document:
+    css: floating-toc.css
+    toc: true
+---
+
+## Overview
+
+In this script, we perform DAPC (Dicriminant analysis of Principal Components) on the Himalayan birds data. 
+
+```{r echo=TRUE, eval=TRUE}
+
+data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
+
+counts=as.matrix(data[,-1]);
+
+rownames(counts)=data[,1];
+
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+
+new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
+new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
+new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
+new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
+
+new_counts <- as.matrix(new_data);
+
+rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
+colnames(new_counts) <- bird_species;
+new_counts <- new_counts[-(1:3),];
+
+```
+
+## Loading metadata
+
+The metadata rows are arranged in the same order as in the data (checked).
+
+```{r echo=TRUE, eval=TRUE}
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE);
+elevation_metadata=metadata$Elevation;
+
+east_west_dir = metadata$WorE;
+
+```
+
+
+## 2 cluster model
+
+```{r echo=TRUE, eval=TRUE}
+library("adegenet")
+n.clust <- 2
+grp <- find.clusters(new_counts, max.n=35, n.pca=200, scale=FALSE,
+n.clust=n.clust) # takes about 2 minutes
+dapc_out <- dapc(data.frame(new_counts), grp$grp, n.pca=10, n.da=7, center=TRUE,
+     scale=FALSE, var.contrib=TRUE, var.loadings=FALSE, pca.info=TRUE,
+     pca.select=c("nbEig","percVar"), perc.pca=NULL)
+
+
+myCol_list <- c("lightblue","green","purple","orange", "red", "blue")
+myCol <- myCol_list[1:n.clust];
+scatter(dapc_out, posi.da="bottomright", bg="white", col=myCol, pch=17:22)
+dapc_out$posterior
+
+compoplot(dapc_out, posi="bottomright",
+txt.leg=paste("Cluster", 1:4), lab="",
+ncol=2, xlab="individuals", col=myCol)
+
+```
+
+
+### Ordering dapc clusters by elevation
+
+```{r echo=TRUE, eval=TRUE}
+K <- 4
+barplot(t(dapc_out$posterior[order(elevation_metadata),]),col=myCol,axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+```
+
+### Ordering dapc clusters by WorE
+
+```{r echo=TRUE, eval=TRUE}
+east_west_elevation = paste0(metadata$WorE, "_", metadata$Elevation);
+
+index1 <- which(metadata$WorE=="E");
+index2 <- which(metadata$WorE=="W");
+elevation1 <- metadata$Elevation[index1]; elevation2 <- metadata$Elevation[index2];
+index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
+
+    barplot(t(dapc_out$posterior[index_WE,]),col=myCol,axisnames=F,space=0,border=NA,main=paste("No. of clusters=",length(myCol)),las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+
+    combo_patch_dir = paste0(east_west_elevation);
+    combo_patch_dir_ordered = combo_patch_dir[index_WE];
+
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+```
+
+
+## 3 cluster model
+
+```{r echo=TRUE, eval=TRUE}
+library("adegenet")
+n.clust <- 3
+grp <- find.clusters(new_counts, max.n=35, n.pca=200, scale=FALSE,
+n.clust=n.clust) # takes about 2 minutes
+dapc_out <- dapc(data.frame(new_counts), grp$grp, n.pca=10, n.da=7, center=TRUE,
+     scale=FALSE, var.contrib=TRUE, var.loadings=FALSE, pca.info=TRUE,
+     pca.select=c("nbEig","percVar"), perc.pca=NULL)
+
+
+myCol_list <- c("lightblue","green","purple","orange", "red", "blue")
+myCol <- myCol_list[1:n.clust];
+scatter(dapc_out, posi.da="bottomright", bg="white", col=myCol, pch=17:22)
+dapc_out$posterior
+
+compoplot(dapc_out, posi="bottomright",
+txt.leg=paste("Cluster", 1:4), lab="",
+ncol=2, xlab="individuals", col=myCol)
+
+```
+
+
+### Ordering dapc clusters by elevation
+
+```{r echo=TRUE, eval=TRUE}
+K <- 4
+barplot(t(dapc_out$posterior[order(elevation_metadata),]),col=myCol,axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+```
+
+### Ordering dapc clusters by WorE
+
+```{r echo=TRUE, eval=TRUE}
+east_west_elevation = paste0(metadata$WorE, "_", metadata$Elevation);
+
+index1 <- which(metadata$WorE=="E");
+index2 <- which(metadata$WorE=="W");
+elevation1 <- metadata$Elevation[index1]; elevation2 <- metadata$Elevation[index2];
+index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
+
+    barplot(t(dapc_out$posterior[index_WE,]),col=myCol,axisnames=F,space=0,border=NA,main=paste("No. of clusters=",length(myCol)),las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+
+    combo_patch_dir = paste0(east_west_elevation);
+    combo_patch_dir_ordered = combo_patch_dir[index_WE];
+
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+```
+
+## 4 cluster model
+
+```{r echo=TRUE, eval=TRUE}
+library("adegenet")
+n.clust <- 4
+grp <- find.clusters(new_counts, max.n=35, n.pca=200, scale=FALSE,
+n.clust=n.clust) # takes about 2 minutes
+dapc_out <- dapc(data.frame(new_counts), grp$grp, n.pca=10, n.da=7, center=TRUE,
+     scale=FALSE, var.contrib=TRUE, var.loadings=FALSE, pca.info=TRUE,
+     pca.select=c("nbEig","percVar"), perc.pca=NULL)
+
+
+myCol_list <- c("lightblue","green","purple","orange", "red", "blue")
+myCol <- myCol_list[1:n.clust];
+scatter(dapc_out, posi.da="bottomright", bg="white", col=myCol, pch=17:22)
+dapc_out$posterior
+
+compoplot(dapc_out, posi="bottomright",
+txt.leg=paste("Cluster", 1:4), lab="",
+ncol=2, xlab="individuals", col=myCol)
+
+```
+
+
+### Ordering dapc clusters by elevation
+
+```{r echo=TRUE, eval=TRUE}
+K <- 4
+barplot(t(dapc_out$posterior[order(elevation_metadata),]),col=myCol,axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+```
+
+### Ordering dapc clusters by WorE
+
+```{r echo=TRUE, eval=TRUE}
+east_west_elevation = paste0(metadata$WorE, "_", metadata$Elevation);
+
+index1 <- which(metadata$WorE=="E");
+index2 <- which(metadata$WorE=="W");
+elevation1 <- metadata$Elevation[index1]; elevation2 <- metadata$Elevation[index2];
+index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
+
+    barplot(t(dapc_out$posterior[index_WE,]),col=myCol,axisnames=F,space=0,border=NA,main=paste("No. of clusters=",length(myCol)),las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+
+    combo_patch_dir = paste0(east_west_elevation);
+    combo_patch_dir_ordered = combo_patch_dir[index_WE];
+
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+```
+
+## Conclusions
+
+The DAPC does not seem to be very successful in detecting biologically meaningful clusters. This may be because of the count structure of the data and the sparsity considerations that DAPC does not model and topic models do.
