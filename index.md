@@ -12,6 +12,7 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [Admixture model on map data with abundance: K=2, K=3](project/src/standard_topic_model_abundance.html)
   * [cluster maps of India K=2,3,4: abundance + non_abundance](project/src/Map_motifs_2_3_4.html)
   * [DAPC- Discriminant Analysis Principal components on birds](project/src/dapc_birds.html)
+  * [Admixture model, K=2,3, on sliding window species bins by bodymass](project/src/running_window_topic_models.html)
   
   
   
