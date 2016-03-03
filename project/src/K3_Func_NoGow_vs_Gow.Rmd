@@ -1,0 +1,481 @@
+---
+title: "Functional Binning Analysis, K=3"
+author: "Alex White"
+date: "February 29, 2016"
+output: html_document
+---
+Functional Motifs using PC1, without diet 
+```{r, echo =F}
+library(maptpx)
+library(CountClust)
+
+#################
+
+data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
+
+counts=as.matrix(data[,-1]);
+
+rownames(counts)=data[,1];
+
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+
+new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
+new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
+new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
+new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
+
+new_counts <- as.matrix(new_data);
+
+rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
+colnames(new_counts) <- bird_species;
+new_counts <- new_counts[-(1:3),];
+
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE,row.names = 1);
+elevation_metadata=metadata$Elevation[match(rownames(new_counts),rownames(metadata))];
+east_west_dir = metadata$WorE
+
+####### Run Principal Components Analysis #########
+data.present <- read.csv("Himalayan_grid_matrix.csv",header=TRUE, row.names = 1);
+data.present <- data.present[,colnames(data.present[,which(colSums(data.present) > 0)])]
+new_counts <- new_counts[,colnames(new_counts[,which(colSums(new_counts) > 0)])]
+morph <- read.csv(file = "AllDatMerged3.csv", header = T, row.names =1)
+
+morph <- morph[as.vector(colnames(data.present)),]
+morph <- na.omit(morph[,c(1,2,3,4,5,12)])
+morph <- log(morph)
+
+morph.pc <- prcomp(morph,center = T,scale=T)
+morph.pc$rotation
+summary(morph.pc)
+
+morph.scores <- as.data.frame(morph.pc$x)
+morph.scores.1.2 <- morph.scores[,1:2]
+morph.scores.1 <- as.data.frame(morph.scores.1.2[,1])
+morph.scores.2 <- as.data.frame(morph.scores.1.2[,2])
+
+rownames(morph.scores.1) <- as.vector(rownames(morph))
+colnames(morph.scores.1) <- c("PC1")
+rownames(morph.scores.2) <- as.vector(rownames(morph))
+colnames(morph.scores.2) <- c("PC2")
+
+PC1_val <- as.vector(morph.scores.1[,1])
+PC_birds <- as.vector(rownames(morph.scores.1))
+
+PC1_matched <- morph.scores.1[match(colnames(new_counts),PC_birds),1];
+summary(PC1_matched)
+
+PC2_val <- as.vector(morph.scores.2[,1])
+PC_birds <- as.vector(rownames(morph.scores.2))
+
+PC2_matched <- morph.scores.2[match(colnames(new_counts),PC_birds),1];
+summary(PC2_matched)
+
+ordered_counts <- new_counts[,order(PC1_matched, decreasing = FALSE)]
+
+ordered_counts2 <- new_counts[,order(PC2_matched, decreasing = FALSE)]
+
+##### binning function by PC1 ######
+binning_topics.PC.1 <- function(n_breaks,K){
+  PC1_ordered <- PC1_matched[order(PC1_matched, decreasing = FALSE)];
+  histo <- hist(PC1_ordered, breaks=n_breaks)
+  span <- histo$breaks[2] - histo$breaks[1]
+  orig.breaks <- histo$breaks
+  
+  binned_data = NULL
+  histo$breaks <- histo$breaks[-1];
+  
+  
+  for(l in 1:length(histo$breaks))
+  {
+    if(l==1){
+      indices <- which(PC1_ordered < histo$breaks[l])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts)[1])}
+      if(length(indices)==1){ out <- ordered_counts[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts[,indices])}
+    }
+    if(l > 1){
+      indices <- which(PC1_ordered < histo$breaks[l] & PC1_ordered > histo$breaks[(l-1)])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts)[1])}
+      if(length(indices)==1){ out <- ordered_counts[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts[,indices])}
+    }
+    binned_data <- cbind(binned_data, out);
+  }
+  colnames(binned_data) <- histo$mids
+  
+  out1 <- topics(binned_data, K=K, tol=0.0001)
+  
+  theta <- out1$theta
+  features <- ExtractTopFeatures(theta,top_features=3,method="poisson")
+  
+  for (j in 1:K){
+    print(paste("Motif",j,"top contributors by PC1"))
+    lower.bound <- as.numeric(colnames(binned_data)[features[j,]]) - (span/2)
+    upper.bound <- as.numeric(colnames(binned_data)[features[j,]]) + (span/2)
+    print(as.numeric(colnames(binned_data)[features[j,]]))
+    for (z in 1:length(lower.bound)){
+      print(paste("Bin",z))
+      print(lower.bound[z])
+      print(upper.bound[z])
+      birds <- rownames(subset(morph.scores.1, PC1>lower.bound[z] & PC1<upper.bound[z]))
+      abun <- colSums(data[,birds])/sum(colSums(data[,birds]))
+      birds <- birds[order(abun, decreasing = T)]
+      abun <- abun[order(abun, decreasing = T)]
+      print(abun[1:10])
+    }
+  }
+  
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  forest_patch_label <- rownames(metadata)
+  
+  barplot(t(out1$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+          main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Assemblage Motifs by PC1,k=",K,"bins=",n_breaks))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5)
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+  par(mfrow=c(K,1))
+  for (i in 1:K){
+    barplot(t(as.vector(out1$theta[,i])), col=cbbPalette[(i+1)], main=paste("Motif",i),
+            xlab="PC1 Score Bins", ylab="theta")
+  }
+}
+binning_topics.PC.1(20,K=3)
+```
+
+My interpretation of the PC1 binning, without diet or other ecological factors: Basically PC1 is largely body size, and the binning is roughly by size classes, Medium (motif 1, orange), Large (motif 2, blue), and Small (motif 3, green). The three size classes contribute roughly equivalently along the elevational gradient in both the east and west, much unlike the taxonomic case, where an entirely new motif appeared in the low elevation west in the K=3 case. This indicated rough functional equivalence of body size along the elevational gradient (this despite climatic differences). Also, most communities comprise more than one motif.  
+
+Now, functional Motifs using PC2, without diet - 
+
+```{r, echo=F}
+binning_topics.PC.2 <- function(n_breaks,K){
+  PC2_ordered <- PC2_matched[order(PC2_matched, decreasing = FALSE)];
+  histo <- hist(PC2_ordered, breaks=n_breaks)
+  span <- histo$breaks[2] - histo$breaks[1]
+  orig.breaks <- histo$breaks
+  
+  binned_data = NULL
+  histo$breaks <- histo$breaks[-1];
+  
+  
+  for(l in 1:length(histo$breaks))
+  {
+    if(l==1){
+      indices <- which(PC2_ordered < histo$breaks[l])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts2)[1])}
+      if(length(indices)==1){ out <- ordered_counts2[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts2[,indices])}
+    }
+    if(l > 1){
+      indices <- which(PC2_ordered < histo$breaks[l] & PC2_ordered > histo$breaks[(l-1)])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts2)[1])}
+      if(length(indices)==1){ out <- ordered_counts2[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts2[,indices])}
+    }
+    binned_data <- cbind(binned_data, out);
+  }
+  colnames(binned_data) <- histo$mids
+  
+  out1 <- topics(binned_data, K=K, tol=0.0001)
+  
+  theta <- out1$theta
+  features <- ExtractTopFeatures(theta,top_features=3,method="poisson")
+  
+  for (j in 1:K){
+    print(paste("Motif",j,"top contributors by PC2"))
+    lower.bound <- as.numeric(colnames(binned_data)[features[j,]]) - (span/2)
+    upper.bound <- as.numeric(colnames(binned_data)[features[j,]]) + (span/2)
+    print(as.numeric(colnames(binned_data)[features[j,]]))
+    for (z in 1:length(lower.bound)){
+      print(paste("Bin",z))
+      print(lower.bound[z])
+      print(upper.bound[z])
+      birds <- rownames(subset(morph.scores.2, PC2>lower.bound[z] & PC2<upper.bound[z]))
+      abun <- colSums(data.present[,birds])/sum(colSums(data.present[,birds]))
+      birds <- birds[order(abun, decreasing = T)]
+      abun <- abun[order(abun, decreasing = T)]
+      print(abun[1:10])
+    }
+  }
+  
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  forest_patch_label <- rownames(metadata)
+  
+  barplot(t(out1$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+          main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Assemblage Motifs by PC2,k=",K,"bins=",n_breaks))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5)
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+  par(mfrow=c(K,1))
+  for (i in 1:K){
+    barplot(t(as.vector(out1$theta[,i])), col=cbbPalette[(i+1)], main=paste("Motif",i),
+            xlab="PC2 Score Bins", ylab="theta")
+  }
+}
+binning_topics.PC.2(20,K=3)
+```
+
+My interpretation of the PC2 binning, without diet or other ecological factors: PC 2 perhaps reveals some of the unique features of the eastern fauna given the large contribution of Motif 3 (green) at mid-elevations in the east.  From my trying to interpret the PC loadings, this is perhaps a contribuion of things with short wings and long tarsi, like Tesia, Pneopyga, Trocholopteron, and Brachypteryx, and this motif may include those bill/body shapes which are associated with foraging in the undergrowth and dispersal limitation (hench their commonness in the east). Here I think we can also gain a better understanding why the taxonomic K=3 case shows an elevationally widespread motif in the West, as Motif 1 (orange) is widespread there is perhaps a functional shape explanation for the widespread west low taxonomic motif.  
+
+Below you will see that motifs generated using PC binning with gower distance appear more linked to the transitions between the commonness of frigivory and the commonness of insectovory.  For PC1 Gower, the shared transition between the East and West for the K=2 taxonomic case clearly follows the shared PC1 gower transition points between the contrbution of the Green Motif 3, and Blue Motif 2.  In general, perhaps the differences between the k=2 and k=3 taxonomic analyses rely on the opposing effects of the underlying contrbiutions of these various functional components (the local resource base and the local forest structure).  Perhaps in this way we see that taxonomic analyses reveal the regional effects of wource pool contrbutions, and the functional analyses reveal the local effects of ecological opporunity.   See Gower PC results below. 
+
+Functional Motifs using PC1, with diet (this is with Gower transformation of the diet variable) 
+
+```{r, echo=F}
+library(maptpx)
+library(CountClust)
+
+data <- read.csv("Himalayan_grid_matrix.csv",header=TRUE);
+
+counts <- as.matrix(data[,-1]);
+
+rownames(counts) <- data[,1];
+
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+
+new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
+new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
+new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
+new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
+
+new_counts <- as.matrix(new_data);
+
+rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
+colnames(new_counts) <- bird_species;
+new_counts <- new_counts[-(1:3),];
+
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE,row.names = 1);
+elevation_metadata=metadata$Elevation[match(rownames(new_counts),rownames(metadata))];
+east_west_dir = metadata$WorE
+
+####### Run Principal Components Analysis #########
+data.present <- read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE, row.names = 1);
+data.present <- data.present[,colnames(data.present[,which(colSums(data.present) > 0)])]
+new_counts <- new_counts[,colnames(new_counts[,which(colSums(new_counts) > 0)])]
+morph <- read.csv(file = "AllDatMerged3.csv", header = T, row.names =1)
+
+morph <- morph[as.vector(colnames(data.present)),]
+morph <- na.omit(morph[,c(1,2,3,4,5,12,47:52)])
+morph.log <- log(morph[,1:6])
+morph[,7:12][morph[,7:12] == 5] <- 1
+morph.gow <- morph[,7:12]
+morph <- cbind(morph.log, morph.gow)
+
+morph.pc <- prcomp(morph)
+morph.pc$rotation
+summary(morph.pc)
+
+morph.scores <- as.data.frame(morph.pc$x)
+morph.scores.1.2 <- morph.scores[,1:2]
+morph.scores.1 <- as.data.frame(morph.scores.1.2[,1])
+morph.scores.2 <- as.data.frame(morph.scores.1.2[,2])
+
+rownames(morph.scores.1) <- as.vector(rownames(morph))
+colnames(morph.scores.1) <- c("PC1")
+rownames(morph.scores.2) <- as.vector(rownames(morph))
+colnames(morph.scores.2) <- c("PC2")
+
+PC1_val <- as.vector(morph.scores.1[,1])
+PC_birds <- as.vector(rownames(morph.scores.1))
+
+PC1_matched <- morph.scores.1[match(colnames(new_counts),PC_birds),1];
+summary(PC1_matched)
+
+PC2_val <- as.vector(morph.scores.2[,1])
+PC_birds <- as.vector(rownames(morph.scores.2))
+
+PC2_matched <- morph.scores.2[match(colnames(new_counts),PC_birds),1];
+summary(PC2_matched)
+
+ordered_counts <- new_counts[,order(PC1_matched, decreasing = FALSE)]
+
+ordered_counts2 <- new_counts[,order(PC2_matched, decreasing = FALSE)]
+
+binning_topics.gow.PC.1 <- function(n_breaks,K){
+  PC1_ordered <- PC1_matched[order(PC1_matched, decreasing = FALSE)];
+  histo <- hist(PC1_ordered, breaks=n_breaks)
+  span <- histo$breaks[2] - histo$breaks[1]
+  orig.breaks <- histo$breaks
+  
+  binned_data = NULL
+  histo$breaks <- histo$breaks[-1];
+  
+  
+  for(l in 1:length(histo$breaks))
+  {
+    if(l==1){
+      indices <- which(PC1_ordered < histo$breaks[l])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts)[1])}
+      if(length(indices)==1){ out <- ordered_counts[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts[,indices])}
+    }
+    if(l > 1){
+      indices <- which(PC1_ordered < histo$breaks[l] & PC1_ordered > histo$breaks[(l-1)])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts)[1])}
+      if(length(indices)==1){ out <- ordered_counts[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts[,indices])}
+    }
+    binned_data <- cbind(binned_data, out);
+  }
+  colnames(binned_data) <- histo$mids
+  
+  out1 <- topics(binned_data, K=K, tol=0.0001)
+  
+  theta <- out1$theta
+  features <- ExtractTopFeatures(theta,top_features=3,method="poisson")
+  
+  for (j in 1:K){
+    print(paste("Motif",j,"top contributors by PC1"))
+    lower.bound <- as.numeric(colnames(binned_data)[features[j,]]) - (span/2)
+    upper.bound <- as.numeric(colnames(binned_data)[features[j,]]) + (span/2)
+    print(as.numeric(colnames(binned_data)[features[j,]]))
+    for (z in 1:length(lower.bound)){
+      print(paste("Bin",z))
+      print(lower.bound[z])
+      print(upper.bound[z])
+      birds <- rownames(subset(morph.scores.1, PC1>lower.bound[z] & PC1<upper.bound[z]))
+      abun <- colSums(data[,birds])/sum(colSums(data[,birds]))
+      birds <- birds[order(abun, decreasing = T)]
+      abun <- abun[order(abun, decreasing = T)]
+      print(abun[1:10])
+    }
+  }
+  
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  forest_patch_label <- rownames(metadata)
+  
+  barplot(t(out1$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+          main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Assemblage Motifs by Gower PC1,k=",K,"bins=",n_breaks))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5)
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+  par(mfrow=c(K,1))
+  for (i in 1:K){
+    barplot(t(as.vector(out1$theta[,i])), col=cbbPalette[(i+1)], main=paste("Motif",i),
+            xlab="PC1 Score Bins", ylab="theta")
+  }
+}
+
+binning_topics.gow.PC.1(20,K=3)
+```
+
+Functional Motifs using PC2, with diet 
+
+```{r, echo = F}
+binning_topics.gow.PC.2 <- function(n_breaks,K){
+  PC2_ordered <- PC2_matched[order(PC2_matched, decreasing = FALSE)];
+  histo <- hist(PC2_ordered, breaks=n_breaks)
+  span <- histo$breaks[2] - histo$breaks[1]
+  orig.breaks <- histo$breaks
+  
+  binned_data = NULL
+  histo$breaks <- histo$breaks[-1];
+  
+  
+  for(l in 1:length(histo$breaks))
+  {
+    if(l==1){
+      indices <- which(PC2_ordered < histo$breaks[l])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts2)[1])}
+      if(length(indices)==1){ out <- ordered_counts2[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts2[,indices])}
+    }
+    if(l > 1){
+      indices <- which(PC2_ordered < histo$breaks[l] & PC2_ordered > histo$breaks[(l-1)])
+      if(length(indices)==0){ out <- rep(0,dim(ordered_counts2)[1])}
+      if(length(indices)==1){ out <- ordered_counts2[,indices]}
+      if(length(indices)> 1){ out <- rowSums(ordered_counts2[,indices])}
+    }
+    binned_data <- cbind(binned_data, out);
+  }
+  colnames(binned_data) <- histo$mids
+  
+  out1 <- topics(binned_data, K=K, tol=0.0001)
+  
+  theta <- out1$theta
+  features <- ExtractTopFeatures(theta,top_features=3,method="poisson")
+  
+  for (j in 1:K){
+    print(paste("Motif",j,"top contributors by PC2"))
+    lower.bound <- as.numeric(colnames(binned_data)[features[j,]]) - (span/2)
+    upper.bound <- as.numeric(colnames(binned_data)[features[j,]]) + (span/2)
+    print(as.numeric(colnames(binned_data)[features[j,]]))
+    for (z in 1:length(lower.bound)){
+      print(paste("Bin",z))
+      print(lower.bound[z])
+      print(upper.bound[z])
+      birds <- rownames(subset(morph.scores.2, PC2>lower.bound[z] & PC2<upper.bound[z]))
+      abun <- colSums(data.present[,birds])/sum(colSums(data.present[,birds]))
+      birds <- birds[order(abun, decreasing = T)]
+      abun <- abun[order(abun, decreasing = T)]
+      print(abun[1:10])
+    }
+  }
+  
+  cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+  
+  forest_patch_label <- rownames(metadata)
+  
+  barplot(t(out1$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+          main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Assemblage Motifs by Gower PC2, k=",K,", bins=",n_breaks))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5)
+  
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+  
+  par(mfrow=c(K,1))
+  for (i in 1:K){
+    barplot(t(as.vector(out1$theta[,i])), col=cbbPalette[(i+1)], main=paste("Motif",i),
+            xlab="PC2 Score Bins", ylab="theta")
+  }
+}
+binning_topics.gow.PC.2(20,K=3)
+```
