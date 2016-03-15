@@ -1,0 +1,143 @@
+---
+title: "Null models for GoM model fit"
+author: "Kushal K Dey"
+date: "March 14, 2016"
+output: 
+  html_document:
+    css: floating-toc.css
+    toc: true
+---
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(CountClust)
+library(picante)
+```
+
+## Overview
+
+The null models are an useful and widely used technique to test for the randomization of ecological presenece absence data. We apply a similar mechanism now for the GoM model fits. 
+
+```{r echo=TRUE, eval=TRUE}
+data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
+counts=as.matrix(data[,-1]);
+rownames(counts)=data[,1];
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
+new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
+new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
+new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
+new_counts <- as.matrix(new_data);
+rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
+colnames(new_counts) <- bird_species;
+new_counts <- new_counts[-(1:3),];
+
+```
+
+We load the metadata
+
+```{r echo=TRUE, eval=TRUE}
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE);
+elevation_metadata=metadata$Elevation;
+
+east_west_dir = metadata$WorE;
+```
+
+We use the `randomizeMatrix()` function due to the package `picante` for applying null models and testing for the efficcacy of the clustering we use. 
+
+## GoM model fit (maptpx) - original data 
+
+```{r echo=TRUE, eval=TRUE}
+topics_clus <- FitGoM(new_counts, K=2, tol=0.1);
+
+K <- 2
+barplot(t(topics_clus[[1]]$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+
+```
+
+## Randomized data + maptpx fit (K=2)
+
+```{r echo=TRUE, eval=TRUE}
+null_counts <- picante::randomizeMatrix(new_counts, null.model = "richness", iterations=1000);
+
+topics_null <- FitGoM(null_counts, K=2, tol=0.1);
+
+K <- 2
+barplot(t(topics_null[[1]]$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+
+
+```
+
+## Null model evaluation
+
+We use the `nullmodel_GoM()` functionality in the CountClust package to obtain statistical measures of 
+how much the observed counts matrix differs from null randomized matrices.
+
+Under the default, we generate 100 randomized matrices and compare the observed
+matrix log Bayes factor with that of the randomized designs.
+
+### Trialswap method
+
+We first use the `trialswap` method. 
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+out <- nullmodel_GoM(new_counts, K=2, null.model = "trialswap")
+print(out$pval)
+```
+
+### Richness method
+
+Then we use the `richness` method.
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+out <- nullmodel_GoM(new_counts, K=2, null.model = "richness")
+print(out$pval)
+```
+
+### Frequency method
+
+Consider now the `frequency` method.
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+out <- nullmodel_GoM(new_counts, K=2, null.model = "frequency")
+print(out$pval)
+```
+
+### Independent Swap method
+
+Finally we consider the `independentswap` method.
+
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+out <- nullmodel_GoM(new_counts, K=2, null.model = "independentswap")
+print(out$pval)
+```
+
+
+## Conclusion
+
+It seems apart from trialswap method, the p-value of the log Bayes factor for the observed data (K=2 vs null) against the distribution of the log Bayes factors for all the randomized data (K=2 vs null) is close to 0. Even for trialswap method it is pretty small, which validates the clustering and solidifies the belief in the clustering.
+
