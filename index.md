@@ -14,6 +14,6 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [DAPC- Discriminant Analysis Principal components on birds](project/src/dapc_birds.html)
   * [Admixture model, K=2,3, on sliding window species bins by bodymass](project/src/running_window_topic_models.html)
   * [Null model randomized matrices for GoM cluster validation](project/src/null_models_GoM.html)
-  
+  * [Preliminary run of wavelet topic model ordtpx on Bird abundance data](project/src/ordtpx_alex_data.html)
   
   
