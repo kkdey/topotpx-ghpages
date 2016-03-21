@@ -1,0 +1,68 @@
+---
+title: "Graphical LASSO application bird abundance"
+author: "Kushal K Dey"
+date: "March 21, 2016"
+output: 
+  html_document:
+    css: floating-toc.css
+    toc: true
+---
+
+## Overview
+
+One of the questions of interest in working with bird abundance data is to find out network motifs
+linking the different bird species. The network building process has so far used the co-occurence
+of the features in the forest spots patterns and the correlation patterns of abundance across the
+bird species. However, the graphical model of interest is to build a graph where there is an edge 
+connecting two features when they are conditionally independent of all the other features. This is
+called Gaussian graphical model, and the way of building the graph is to look at the inverse of 
+the correlation matrix instead of the correlation matrix itself. In a situation like ours, where we
+have number of samples way less than the number of features, we use Graphical LASSO algorithm.
+
+```{r echo=TRUE, eval=TRUE}
+data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
+counts=as.matrix(data[,-1]);
+rownames(counts)=data[,1];
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
+new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
+new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
+new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
+new_counts <- as.matrix(new_data);
+rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
+colnames(new_counts) <- bird_species;
+new_counts <- new_counts[-(1:3),];
+```
+
+We load the metadata
+
+```{r echo=TRUE, eval=TRUE}
+metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE);
+elevation_metadata=metadata$Elevation;
+east_west_dir = metadata$WorE;
+```
+
+## Graphical LASSO algorithm
+
+We perform Graphical LASSO for which we use the `glasso` R package. Since we need the normality
+assumption, we first perform the voom transformation.
+
+```{r echo=TRUE, eval=TRUE}
+voom_counts <- limma::voom(new_counts)$E;
+```
+
+
+```{r echo=TRUE, eval=TRUE}
+var_features <- var(voom_counts)
+system.time(glasso_out <-glasso::glasso(var_features, rho=.01))
+```
+
+Use on Cyberscape the following matrix (representing partial covariance) instead of general covariance matrix. 
+
+```{r}
+glass_weights <- abs(glasso_out$wi);
+```
+

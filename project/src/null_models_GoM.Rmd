@@ -50,7 +50,7 @@ We use the `randomizeMatrix()` function due to the package `picante` for applyin
 ## GoM model fit (maptpx) - original data 
 
 ```{r echo=TRUE, eval=TRUE}
-topics_clus <- FitGoM(new_counts, K=2, tol=0.1);
+topics_clus <- FitGoM(new_counts_3, K=2, tol=0.1);
 
 K <- 2
 barplot(t(topics_clus[[1]]$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
