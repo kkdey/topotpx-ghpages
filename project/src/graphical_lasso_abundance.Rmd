@@ -10,14 +10,9 @@ output:
 
 ## Overview
 
-One of the questions of interest in working with bird abundance data is to find out network motifs
-linking the different bird species. The network building process has so far used the co-occurence
-of the features in the forest spots patterns and the correlation patterns of abundance across the
-bird species. However, the graphical model of interest is to build a graph where there is an edge 
-connecting two features when they are conditionally independent of all the other features. This is
-called Gaussian graphical model, and the way of building the graph is to look at the inverse of 
-the correlation matrix instead of the correlation matrix itself. In a situation like ours, where we
-have number of samples way less than the number of features, we use Graphical LASSO algorithm.
+One of the questions of interest in working with bird abundance data is to find out network motifs linking the different bird species. The network building process has so far used the co-occurence of the features in the forest spots patterns and the correlation patterns of abundance across the bird species. However, the graphical model of interest is to build a graph where there is an edge connecting two features when they are conditionally independent of all the other features. This is called Gaussian graphical model, and the way of building the graph is to look at the inverse of the correlation matrix instead of the correlation matrix itself. In a situation like ours, where we have number of samples way less than the number of features, we use Graphical LASSO algorithm.
+
+## Preparing the Data
 
 ```{r echo=TRUE, eval=TRUE}
 data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
@@ -45,24 +40,97 @@ elevation_metadata=metadata$Elevation;
 east_west_dir = metadata$WorE;
 ```
 
-## Graphical LASSO algorithm
+## Voom transformation + visualization
 
 We perform Graphical LASSO for which we use the `glasso` R package. Since we need the normality
 assumption, we first perform the voom transformation.
 
 ```{r echo=TRUE, eval=TRUE}
+new_counts <- new_counts[, which(colSums(new_counts)!=0)]
 voom_counts <- limma::voom(new_counts)$E;
 ```
 
 
 ```{r echo=TRUE, eval=TRUE}
-var_features <- var(voom_counts)
-system.time(glasso_out <-glasso::glasso(var_features, rho=.01))
+cov_features <- cov(voom_counts)
 ```
 
-Use on Cyberscape the following matrix (representing partial covariance) instead of general covariance matrix. 
+How does the covariance matrix look like.
 
 ```{r}
-glass_weights <- abs(glasso_out$wi);
+cov_features_list <- Matrix::nearPD(cov_features, conv.tol=1e-06);
+image(as.matrix(cov_features_list$mat))
+```
+
+## Graphical LASSO algorithm + Adaptive Shrinkage
+
+```{r}
+system.time(glasso_out <-glasso::glasso(cov_features, rho=.01))
+
+```
+
+We convert the estimated invariance covariance matrix to correlation
+matrix and the shrink it by ash-cor function.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(network)
+glasso_out$wi.cor <- cov2cor(glasso_out$wi);
+source("../R/ash_cor.R")
+glasso_out$wi.cor.shrunk <- ash_cor(glasso_out$wi.cor, nsamples=293);
+glasso_out$wi.cor.shrunk[which(abs(glasso_out$wi.cor.shrunk) < 0.001)]=0;
+row.names(glasso_out$wi.cor.shrunk) <- colnames(cov_features);
+```
+
+## Network Analysis
+
+We plot the network corresponding to the shrunk estimated inverse
+correlation matrix to extract causal relationship.
+
+```{r}
+grids.net <- network::network(as.matrix(abs(glasso_out$wi.cor.shrunk)),   vertex.attr=NULL, vertex.attrnames=row.names(glasso_out$wi.cor.shrunk),  
+directed=F, hyper=FALSE, loops=FALSE, multiple=FALSE, bipartite = F)
+
+#grids.net
+#grids.net[8,]
+#network.size(grids.net)
+#network.edgecount(grids.net)
+#network.density(grids.net)
+
+adjacency.matrix <- as.sociomatrix(grids.net)
+all(grids.net[,]==adjacency.matrix) # should be TRUE
+
+edgelist.matrix <- as.matrix(grids.net,matrix.type="edgelist")
+
+list.vertex.attributes(grids.net)
+grids.net %v% "vertex.names" <- row.names(glasso_out$wi.cor.shrunk)
+#get.vertex.attribute(grids.net,"vertex.names")
+
+list.edge.attributes(grids.net)
+
+signed.weight.vec <- array(0,dim(edgelist.matrix)[1])
+for(m in 1:dim(edgelist.matrix)[1])
+{
+  signed.weight.vec[m] <- glasso_out$wi[edgelist.matrix[m,1], edgelist.matrix[m,2]];
+}
+
+signed.vec <- array(0,dim(edgelist.matrix)[1])
+signed.vec[which(signed.weight.vec>0)]="Pos"
+signed.vec[which(signed.weight.vec<0)]="Neg"
+
+color.vec <- plyr::mapvalues(signed.vec, from = c("Pos", "Neg"), to = c("blue", "green"))
+
+grids.net %e% "color.vec" <- color.vec
+
+list.edge.attributes(grids.net)
+
+
+plot(grids.net, 
+     label=grids.net %v% "vertex.names",
+     thresh=0.1,
+     displaylabels=TRUE,
+     label.cex=0.3,
+     edge.col=grids.net %e% "color.vec",
+     edge.label.cex=1,
+     mode="fruchtermanreingold")
 ```
 
