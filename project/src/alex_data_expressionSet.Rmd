@@ -1,0 +1,86 @@
+---
+title: "Alex Bird Data package"
+author: "Kushal K Dey"
+date: "April 9, 2016"
+output: html_document
+---
+
+## Overview
+
+The script is aimed at building an ExpressionSet object from Alex's Bird data 
+
+```{r}
+
+data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
+counts=as.matrix(data[,-1]);
+rownames(counts)=data[,1];
+new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
+new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
+bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
+
+pooled_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
+pooled_data[1:dim(counts)[1],match(colnames(counts),bird_species)]=counts;
+pooled_data[dim(counts)[1]+1,match(new_data2[,1],bird_species)] = new_data2[,2];
+pooled_data[dim(counts)[1]+2,match(new_data1[,1],bird_species)] = new_data1[,2];
+pooled_data[dim(counts)[1]+3,match(new_data1[,1],bird_species)] = new_data1[,3];
+
+rownames(pooled_data) <- c(rownames(counts), c("MA", "U1", "U2"));
+colnames(pooled_data) <- bird_species;
+
+reads <- t(pooled_data);
+
+bodymass_data <- read.csv("../external_data/massKushal.csv")
+bodymass_data_filtered <- bodymass_data[match(bird_species, bodymass_data[,1]),];
+
+
+row_data <- data.frame(gene_name = as.character(rownames(reads)),
+                       bodymass = bodymass_data_filtered,
+                       stringsAsFactors = FALSE)
+rownames(row_data) <- rownames(reads)
+
+metadata <- read.csv("../external_data/gridsmeta.csv");
+
+as.character(metadata[,1])==rownames(pooled_data)
+
+
+featuredata <- cbind.data.frame(bird_species, bodymass_data_filtered);
+colnames(featuredata) <- c("Bird Species", "Bodymass");
+
+phenodata <- data.frame(metadata);
+rownames(phenodata) <- rownames(pooled_data);
+colnames(phenodata) <- colnames(metadata)
+
+
+col_data <- data.frame(
+    Elevation = metadata$Elevation,
+    North = metadata$North,
+    East = metadata$East,
+    WorE = metadata$WorE,
+    bio5Warmest = metadata$bio5Warmest,
+    bio7temprange = metadata$bio7temprange,
+    bio12precip = metadata$bio12precip,
+    bio15precipseasonal = metadata$bio15precipseasonal);
+
+colnames(col_data) <- c("Elevation","North","East","WorE",
+                        "bio5Warmest","bio7temprange","bio12precip",
+                        "bio15precipseasonal");
+rownames(col_data) <- colnames(reads);
+
+
+library(Biobase)
+
+
+HimalayanBirdsAbundance <- new("ExpressionSet",
+                exprs = as.matrix(reads),
+                phenoData = new("AnnotatedDataFrame",
+                                data = col_data),
+                featureData = new("AnnotatedDataFrame",
+                                  data = row_data),
+                experimentData = new("MIAME",
+                                     title = "Alex Trevor Himalayan Birds"))
+
+save(HimalayanBirdsAbundance, file="../rdas/HimalayanBirdsAbundance.rda")
+
+
+```
+

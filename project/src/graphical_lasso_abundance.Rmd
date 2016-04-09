@@ -10,83 +10,88 @@ output:
 
 ## Overview
 
-One of the questions of interest in working with bird abundance data is to find out network motifs linking the different bird species. The network building process has so far used the co-occurence of the features in the forest spots patterns and the correlation patterns of abundance across the bird species. However, the graphical model of interest is to build a graph where there is an edge connecting two features when they are conditionally independent of all the other features. This is called Gaussian graphical model, and the way of building the graph is to look at the inverse of the correlation matrix instead of the correlation matrix itself. In a situation like ours, where we have number of samples way less than the number of features, we use Graphical LASSO algorithm.
+A major problem of interest in working with bird abundance data is to determine network motifs linking different bird species. Thus far (results with Alex), we have used correlation metric and co-occurence patterns to build the networks over features, based on their abundance patterns across forest patches. Here we focus on building causal relationships among the bird species, using partial correlation structure across the species to build the networks. This is a very common technique of building causal graphs in Gaussian Graphical Models. Since the number of species ($p=337$) is way larger than the number of forest spots ($n=38$), we use the Graphical LASSO algorithm to approximate the inverse correlation structure.
 
-## Preparing the Data
+## Data + Metadata Preparation
 
-```{r echo=TRUE, eval=TRUE}
-data=read.csv("../external_data/Himalayan_grid_matrix.csv",header=TRUE);
-counts=as.matrix(data[,-1]);
-rownames(counts)=data[,1];
-new_data1 <- data.frame(read.csv('../external_data/MohanGrids.csv'));
-new_data2 <- data.frame(read.csv('../external_data/MohanGrids2.csv'));
-bird_species <- union(as.vector(colnames(counts)), union(as.vector(new_data1[,1]), as.vector(new_data2[,1])));
-new_data <- matrix(0,dim(counts)[1]+3,length(bird_species));
-new_data[1,match(new_data1[,1],bird_species)]=new_data1[,2];
-new_data[2,match(new_data1[,1],bird_species)]=new_data1[,3];
-new_data[3,match(new_data2[,1],bird_species)]=new_data2[,2];
-new_data[4:(dim(counts)[1]+3),match(colnames(counts),bird_species)]=counts;
-new_counts <- as.matrix(new_data);
-rownames(new_counts) <- c(c("U1","U2","MA1"),rownames(counts));
-colnames(new_counts) <- bird_species;
-new_counts <- new_counts[-(1:3),];
+```{r}
+library(network)
+library(glasso)
+library(limma)
 ```
 
-We load the metadata
 
-```{r echo=TRUE, eval=TRUE}
-metadata=read.csv("../external_data/Himalayan_grid_metadata.csv",header=TRUE);
+```{r echo=TRUE, eval=TRUE, message=FALSE, warning=FALSE}
+library(HimalayanBirdsAbundance)
+data("HimalayanBirdsAbundance")
+new_counts <- t(exprs(HimalayanBirdsAbundance));
+metadata <- pData(HimalayanBirdsAbundance);
+
 elevation_metadata=metadata$Elevation;
 east_west_dir = metadata$WorE;
 ```
 
-## Voom transformation + visualization
 
-We perform Graphical LASSO for which we use the `glasso` R package. Since we need the normality
-assumption, we first perform the voom transformation.
+## Algorithm
+
+We follow the following steps to build the causal network model over the bird species based on the abundance data. 
+
+### Voom transform
+
+Since the data are counts data, it is not prescribed to apply Gaussian graphical model on the raw data. We first remove all the bird species with 0 abundance across all the forest spots from the data and then convert the raw counts to log counts per million or voom transformed counts, a transform that is likely closer to Gaussianity than counts. 
+
 
 ```{r echo=TRUE, eval=TRUE}
 new_counts <- new_counts[, which(colSums(new_counts)!=0)]
 voom_counts <- limma::voom(new_counts)$E;
 ```
 
+### Environmental Variables
 
-```{r echo=TRUE, eval=TRUE}
-cov_features <- cov(voom_counts)
-```
-
-How does the covariance matrix look like.
+Environmental factors often play a major role in determining abundance patterns of a species. Not accounting for environmental effects may lead to false conclusions of causal patterns between two bird species, both of which vary in their abundance based on one or more climatic factors. To account for the climate factors, we pool in climate effects for the forest spots under study- namely Precipitation, Seasonal Precipitation, Highest temperature and the Temperature range. These information are already included in the last 4 columns of the metadata loaded. We pool that information along with the species information.
 
 ```{r}
-cov_features_list <- Matrix::nearPD(cov_features, conv.tol=1e-06);
-image(as.matrix(cov_features_list$mat))
+env.variables <- metadata[,5:8];
+pooled_data <- cbind(voom_counts, env.variables);
 ```
 
-## Graphical LASSO algorithm + Adaptive Shrinkage
+### Estimating Covariance Matrix
+
+We build the estimated covariance matrix over all the species and the environmental variables.
+
+```{r echo=TRUE, eval=TRUE}
+cov_features <- cov(pooled_data)
+```
+
+### Graphical LASSO algorithm
+
+Next we perform Graphical LASSO to obtain approximates of the inverse covariance matrix.
 
 ```{r}
 system.time(glasso_out <-glasso::glasso(cov_features, rho=.01))
 
 ```
 
-We convert the estimated invariance covariance matrix to correlation
-matrix and the shrink it by ash-cor function.
+### ash-cor shrinking GLASSO output
+
+We convert the estimated inverse covariance matrix from GLASSO to correlation
+matrix and then shrink the latter by `ash-cor` (check: [ash-cor Github page](https://github.com/kkdey/ash_stan/tree/master/utilities)) function. To make the graph edges sparse, the correlation values which in absolute value are less than $0.001$ are assumed to be $0$ (this can be viewed as removing very weak causal relations from the graph).
 
 ```{r, echo=TRUE, message=FALSE, warning=FALSE}
 library(network)
 glasso_out$wi.cor <- cov2cor(glasso_out$wi);
 source("../R/ash_cor.R")
-glasso_out$wi.cor.shrunk <- ash_cor(glasso_out$wi.cor, nsamples=293);
+glasso_out$wi.cor.shrunk <- ash_cor(glasso_out$wi.cor, nsamples=309);
 glasso_out$wi.cor.shrunk[which(abs(glasso_out$wi.cor.shrunk) < 0.001)]=0;
 row.names(glasso_out$wi.cor.shrunk) <- colnames(cov_features);
 ```
 
-## Network Analysis
+### Build the causal network
 
-We plot the network corresponding to the shrunk estimated inverse
-correlation matrix to extract causal relationship.
+We build a network on the shrunk estimated inverse correlation matrix to identify
+causal relationships among bird species. We mark the edges representing positive causality with blue and negative causality with green. The nodes representing environmental variables arecolored yellow while the ones corresponding to bird species are colored red.
 
-```{r}
+```{r eval=TRUE, echo=TRUE, warning=FALSE, fig.show="asis", dpi=144, fig.width=7, fig.height=8}
 grids.net <- network::network(as.matrix(abs(glasso_out$wi.cor.shrunk)),   vertex.attr=NULL, vertex.attrnames=row.names(glasso_out$wi.cor.shrunk),  
 directed=F, hyper=FALSE, loops=FALSE, multiple=FALSE, bipartite = F)
 
@@ -104,8 +109,6 @@ edgelist.matrix <- as.matrix(grids.net,matrix.type="edgelist")
 list.vertex.attributes(grids.net)
 grids.net %v% "vertex.names" <- row.names(glasso_out$wi.cor.shrunk)
 #get.vertex.attribute(grids.net,"vertex.names")
-
-list.edge.attributes(grids.net)
 
 signed.weight.vec <- array(0,dim(edgelist.matrix)[1])
 for(m in 1:dim(edgelist.matrix)[1])
@@ -128,9 +131,17 @@ plot(grids.net,
      label=grids.net %v% "vertex.names",
      thresh=0.1,
      displaylabels=TRUE,
-     label.cex=0.3,
+     label.cex=c(rep(0.4, 305), rep(1,4)),
      edge.col=grids.net %e% "color.vec",
      edge.label.cex=1,
+    # vertex.cex= c(rep(2,305),rep(4,4)),
+     vertex.col=c(rep(2,305),rep(7,4)),
+     vertex.lwd=c(rep(1,305), rep(3,4)),
+    # boxed.labels=TRUE,
      mode="fruchtermanreingold")
+
 ```
 
+### Observations
+
+We find there are way more negative causal relationships among bird species and also with respect to the climate variables considered. The negative relationship among bird species can be mainly attributed to comeptition for food and resources.
