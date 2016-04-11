@@ -60,6 +60,13 @@ morph_filtered <- morph[match(rownames(glasso_out$wi.cor.shrunk.birds), rownames
 
 ```
 
+## Correlation among Morphological features
+
+```{r}
+pairs(~BLength + BWidth + BDepth + Wing + Tarsus + Mass, data=morph_filtered, 
+   main="Simple Scatterplot Matrix", col="red", lwd=1, pch=20)
+```
+
 
 ```{r}
 # Multiple plot function
