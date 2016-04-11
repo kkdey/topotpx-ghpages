@@ -16,5 +16,5 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [Null model randomized matrices for GoM cluster validation](project/src/null_models_GoM.html)
   * [Preliminary run of wavelet topic model ordtpx on Bird abundance data](project/src/ordtpx_alex_data.html)
   * [Graphical LASSO application](project/src/graphical_lasso_abundance.html)
-  
+  * [How Morphology affects causality among species](project/src/morphology_causal.html)
   
