@@ -18,3 +18,4 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [Graphical LASSO application](project/src/graphical_lasso_abundance.html)
   * [How Morphology affects causality among species](project/src/morphology_causal.html)
   * [Deep Topic model on Bird abundance data](project/src/alex_trevor_metatopics.html)
+  * [How does morphology affect the ordtpx model?](project/src/ordtpx_phylogenetics_morphology.html)
