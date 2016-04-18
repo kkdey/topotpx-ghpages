@@ -17,4 +17,4 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [Preliminary run of wavelet topic model ordtpx on Bird abundance data](project/src/ordtpx_alex_data.html)
   * [Graphical LASSO application](project/src/graphical_lasso_abundance.html)
   * [How Morphology affects causality among species](project/src/morphology_causal.html)
-  
+  * [Deep Topic model on Bird abundance data](project/src/alex_trevor_metatopics.html)
