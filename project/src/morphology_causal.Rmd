@@ -292,7 +292,7 @@ multiplot(h1, h2, cols=2)
 We now pick the top 4 PCs based on morphological and ecological features and plot the dependency of the causal behavior among the bird species with these features.
 
 ```{r echo=TRUE, eval=FALSE, warning=FALSE, message=FALSE}
-morph.pc <- prcomp(morph_filtered, center=T, scale=T)
+morph.pc <- prcomp(t(morph_filtered), center=T, scale=T)
 
 PC.dist <- do.call(cbind, lapply(1:dim(morph.pc$x)[2],
                      function(l)  {
