@@ -44,7 +44,7 @@ ordered_counts <- new_counts[,order(bodymass_matched, decreasing = FALSE)];
 
 ```
 
-## ordtpx (K=2) [high smoothness]
+## ordtpx (K=2) [medium smoothness]
 
 ```{r echo=TRUE, eval=TRUE}
 library(ordtpx)
@@ -99,7 +99,7 @@ plot(Topic_clus$theta[,1], type="l")
 plot(Topic_clus$theta[,2], type="l")
 ```
 
-## ordtpx K=3 [high smoothness]
+## ordtpx K=3 [medium smoothness]
 
 ```{r echo=TRUE, eval=TRUE}
 del_beta <- scale*(10^{1:(levels-1)})
@@ -341,7 +341,7 @@ plot(Topic_clus$theta[,3], type="l")
 ```
 
 
-## ordtpx (K=2) [extreme smoothness]
+## ordtpx (K=2) [very high smoothness]
 
 ```{r echo=TRUE, eval=TRUE}
 library(ordtpx)
@@ -396,7 +396,7 @@ plot(Topic_clus$theta[,1], type="l")
 plot(Topic_clus$theta[,2], type="l")
 ```
 
-## ordtpx K=3 [extreme smoothness]
+## ordtpx K=3 [very high smoothness]
 
 ```{r echo=TRUE, eval=TRUE}
 del_beta <- scale*(10^{1:(levels-1)})
@@ -452,7 +452,10 @@ plot(Topic_clus$theta[1:337,3], type="l")
 
 ## Conclusions 
 
-Under low smoothness, the ordtpx results closely match with standard topic model results. But the high smoothness case creates topics which are smoothly varying across the bird species bodymass and the clusters formed are different (specially for K=3 case) compared to the ordtpx with low smoothness and standard topic model fit.
+Under low smoothness, the ordtpx results closely match with standard topic model results.
+Under medium smoothness, we get topics which are determined by low bodymass, medium bodymass and high bodymasses. The topics are also smoothly varying. The extreme high smoothness case however fails to differentiate between the clusters or topics.
+
+
 
 
 
