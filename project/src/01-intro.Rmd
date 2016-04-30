@@ -1,0 +1,20 @@
+# Introduction {#intro}
+
+The goal of this study is to develop a network construction approach to infer species associations and causal relationships (adjusted for by environmental and abiotic factors) from species co-occurrence data. 
+
+Trevor Price's lab recently collected Hiamlayan bird species ($330$ in total) abundance data across $35$ sites from the Western and Eastern Himalayan ranges. We have already seen that the bird species distribution shows nice patterns of variation across elevation and geography of the sites from where the abundance data was collected. 
+
+Some of the questions specifically now are 
+
+- Which bird species causally affect each other, or in other words, are correlated even after adjusting for the correlations with all other species. 
+
+- How to deal with environmental variables, should we remove their effects before looking at the bird species associations or whether we would want to pool them in the network model. The idea here is that the correlation between bird species in the first step should be devoid of any influence of environmental or abiotic factors. 
+
+- Which bird species are aggregators and segregators?
+
+- Are there clusters in the network? What do these clusters represent? 
+
+- A common issue in constructing networks is shrinkage, rather shrinking the very weak associations to $0$ and retaining the strong associations. That makes us think whether one can apply an adaptive shrinkage method for the network learning.
+
+Check \@ref(review) for literature review of the state of the art models that are being currently used for network learning of species co-occurrence data.
+

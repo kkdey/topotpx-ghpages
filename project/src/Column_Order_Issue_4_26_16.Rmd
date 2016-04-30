@@ -1,0 +1,264 @@
+---
+title: "Discrepencies with order"
+author: "Alex White"
+date: "April 26, 2016"
+output: html_document
+---
+
+```{r echo=TRUE, eval=TRUE}
+#title: "Taxonomic Motif Models"
+#author: "Alex White"
+#date: "March 18, 2016"
+
+######## READ IN DATA #######
+
+library(plotrix)
+library(maptpx)
+library(CountClust)
+library(cluster)
+library(FactoMineR)
+
+source("tpx.R")
+source("count.R")
+source("topics.R")
+
+new_counts <- read.csv("Counts_4_25_16.csv",header=TRUE,row.names=1);
+ordered_counts <- read.csv("Ordered_Counts_4_25_16.csv",header=TRUE,row.names=1);
+
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+bodymass_data <- read.csv('massKushal.csv');
+
+bodymass_val <- bodymass_data[,2];
+bodymass_birds <- bodymass_data[,1];
+
+bodymass_matched <- bodymass_data[match(colnames(new_counts),bodymass_birds),2];
+summary(bodymass_matched)
+
+bodymass_matched2 <- bodymass_data[match(colnames(new_counts),bodymass_birds),];
+rownames(bodymass_matched2) <- bodymass_matched2[,1]
+bodymass_matched2 <- bodymass_matched2[colnames(new_counts),]
+
+mass_counts <- as.matrix(new_counts) %*% diag(bodymass_matched2[,2])
+mass_counts <- log(mass_counts)
+mass_counts[mass_counts==-Inf] <- 0
+mass_counts <- round(mass_counts, digits = 0)
+colnames(mass_counts) <- colnames(new_counts)
+
+metadata <- read.csv("gridsmeta.csv",header=T)
+metadata <-metadata[c(9,8,1,10,6,2,3,36,7,11,5,33,4,30,14,32,31,12,13,37,15,34,19,38,18,35,17,23,16,24,28,21,26,20,27,25,22,29),]
+row.names(metadata) <- metadata$GRID
+east_west_dir = metadata$WorE
+forest_patch_label <- row.names(metadata)
+
+cbbPalette2 <- c("#E69F00", "#56B4E9")
+cbbPalette4<- c("#E69F00","#0072B2","#009E73","#F0E442")
+cbbPalette3 <- c("#E69F00", "#F0E442", "#009E73")
+
+```
+
+RUN TOPIC MODELS (STANDARD)
+
+```{r echo=TRUE, eval=TRUE}
+K.2 <- topics(new_counts, K=2, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+K.2.theta <- K.2$theta
+K.2.features <- ExtractTopFeatures(K.2.theta,top_features=10,method="poisson",options = "min")
+
+K.3 <- topics(new_counts, K=3, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.4 <- topics(new_counts, K=4, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.5 <- topics(new_counts, K=5, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.6 <- topics(new_counts, K=6, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+###### random column order to check that model is not sensative to order ####
+
+K.2.or <- topics(ordered_counts, K=2, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.3.or <- topics(ordered_counts, K=3,tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.4.or <- topics(ordered_counts, K=4,tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.5.or <- topics(ordered_counts, K=5, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+K.6.or <- topics(ordered_counts, K=6, tol=0.00000000001, kill=0, bf=T, light=FALSE, init.adapt=FALSE)
+
+
+```
+
+Notice the warnings after running the standard topic model for k=4 and k=6.  The structure plots show (below) that the omega matrices are different for these values of K when the order is changed.  However, for all other values of K (2,3,5) we get the same omega matrix. 
+
+```{r echo=FALSE, eval=TRUE}
+###Standard Topic Model standard order #######
+###### Plot k = 2#####
+K<-2
+BayFac <- round(K.2$BF[[1]], digits=2)
+{barplot(t(K.2$omega[forest_patch_label,]),col=cbbPalette2[1:K],axisnames=F,space=0,border=NA,
+        main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 3#####
+K<-3
+BayFac <- round(K.3$BF[[1]], digits=2)
+{barplot(t(K.3$omega[forest_patch_label,]),col=cbbPalette3[1:K],axisnames=F,space=0,border=NA,
+        main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 4#####
+K<-4
+BayFac <- round(K.4$BF[[1]], digits=2)
+{barplot(t(K.4$omega[forest_patch_label,]),col=cbbPalette4[1:K],axisnames=F,space=0,border=NA,
+        main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 5#####
+K<-5
+BayFac <- round(K.5$BF[[1]], digits=2)
+{barplot(t(K.5$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+        main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 6#####
+K<-6
+BayFac <- round(K.6$BF[[1]], digits=2)
+{barplot(t(K.6$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###Standard Topic Model Bodymass order #######
+###### Plot k = 2#####
+K<-2
+BayFac <- round(K.2.or$BF[[1]], digits=2)
+{barplot(t(K.2.or$omega[forest_patch_label,]),col=cbbPalette2[1:K],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 3#####
+K<-3
+BayFac <- round(K.3.or$BF[[1]], digits=2)
+{barplot(t(K.3.or$omega[forest_patch_label,]),col=cbbPalette3[1:K],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 4#####
+K<-4
+BayFac <- round(K.4.or$BF[[1]], digits=2)
+{barplot(t(K.4.or$omega[forest_patch_label,]),col=cbbPalette4[1:K],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 5#####
+K<-5
+BayFac <- round(K.5.or$BF[[1]], digits=2)
+{barplot(t(K.5.or$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+###### Plot k = 6#####
+K<-6
+BayFac <- round(K.6.or$BF[[1]], digits=2)
+{barplot(t(K.6.or$omega[forest_patch_label,]),col=cbbPalette[2:(K+1)],axisnames=F,space=0,border=NA,
+         main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+  title(main=paste("Taxonomic Assemblage Motifs, K =",K, ", BF =",BayFac))
+  combo_patch_dir = paste0(forest_patch_label,"_",east_west_dir);
+  combo_patch_dir_ordered = combo_patch_dir[order(east_west_dir)];
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],38);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+  labs=c(0.5,1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5,10.5,11.5,12.5,13.5,14.5,15.5,16.5,17.5,18.5,19.5,20.5,21.5,22.5,23.5,24.5,25.5,26.5,27.5,28.5,29.5,30.5,31.5,32.5,33.5,34.5,35.5,36.5,37.5)
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  ablineclip(v=match_labs[0:length(match_labs)],y1=0,y2=1);}
+
+```
+
