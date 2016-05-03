@@ -23,5 +23,5 @@ We fit a topographic topic model to find dispersion field motifs that explain th
 
 ### bookdown -methods 
 
-    *[Methods and Materials for ashnet](project/methods/bookdown-template/_book/introduction.html)
+  *[Methods and Materials for ashnet](project/methods/bookdown-template/_book/introduction.html)
 
