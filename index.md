@@ -20,6 +20,8 @@ We fit a topographic topic model to find dispersion field motifs that explain th
   * [How does morphology affect the ordtpx model?](project/src/ordtpx_phylogenetics_morphology.html)
   * [Simulation results for ordtpx](project/src/test2.html)
   * [Preliminary run of wavelet topic model ordtpx on Bird abundance data](project/src/ordtpx_alex_data.html)
+  * [Preliminary run of adaptive ordered topic model using SMASH](project/src/ordtpx_alex_adaptive.html)
+  
 
 ### bookdown -methods 
 
