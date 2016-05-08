@@ -37,6 +37,8 @@ row_data <- data.frame(gene_name = as.character(rownames(reads)),
                        bodymass = bodymass_data_filtered,
                        stringsAsFactors = FALSE)
 rownames(row_data) <- rownames(reads)
+indices <- which(rowSums(reads)!=0)
+row_data <- row_data[indices, ];
 
 metadata <- read.csv("../external_data/gridsmeta.csv");
 
@@ -69,6 +71,7 @@ rownames(col_data) <- colnames(reads);
 
 library(Biobase)
 
+reads <- reads[indices, ];
 
 HimalayanBirdsAbundance <- new("ExpressionSet",
                 exprs = as.matrix(reads),
