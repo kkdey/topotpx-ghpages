@@ -36,35 +36,32 @@ ordered_counts <- new_counts[,order(bodymass_matched, decreasing = FALSE)];
 
 ```
 
-## ordtpx (K=2) [medium smoothness]
+## ordtpx (K=2) - smash
+
+```{r}
+source("../../../ordtpx/R/ord_count.R")
+source("../../../ordtpx/R/ord_mra.R")
+source("../../../ordtpx/R/ord_tpx.R")
+source("../../../ordtpx/R/tpx.R")
+source("../../../ordtpx/R/ord_topics.R")
+source("../../../ordtpx/R/count.R")
+source("../../../ordtpx/R/binshrink.R")
+```
+
 
 ```{r echo=TRUE, eval=TRUE}
 library(ordtpx)
 levels <- ceiling(log(dim(ordered_counts)[2])/log(2))+1;
 
-Topic_clus_list <- vector(mode = "list", length = 25)
-loglik_clus_list <- vector(mode = "list", length = 25)
-
 scale <- 2
 del_beta <- scale*(10^{1:(levels-1)})
-Topic_clus <- ordtpx::ord_topics(ordered_counts, K=2, ztree_options=1, tol=0.1,
-                         init_method = "taddy", adapt.method="smash")
+Topic_clus <- ord_topics(ordered_counts, K=2, ztree_options=1, tol=0.1,
+                         init_method = "taddy", adapt.method="smash",
+                         burn_trials = 1, tmax_start = 2)
 Topic_clus$loglik
-theta <- Topic_clus$theta
-omega <- Topic_clus$omega
-probs <- omega %*% t(theta)
-loglik <- Reduce(sum, sapply(1:NROW(data), function(i) {
-            dmultinom(x = ordered_counts[i,], prob = probs[i,1:305], log = TRUE)
-        }) )
-
-loglik <- loglik - (10^4)*sum((theta[2:dim(theta)[1],] - theta[1:(dim(theta)[1]-1)])^2)
-loglik
-Topic_clus_list[[scale]] <- Topic_clus
-loglik_clus_list[[scale]] <- loglik;
-#print(scale)
 ```
 
-### Structure Plot
+### Structure Plot - elevation
 
 ```{r echo=TRUE, eval=TRUE}
 K <- 2
@@ -84,7 +81,7 @@ abline(v=match_labs[2:length(match_labs)]);
 
 ```
 
-### Topic plots 
+### Cluster plots 
 
 ```{r echo=TRUE, eval=TRUE}
 par(mfrow=c(1,2))
@@ -92,35 +89,18 @@ plot(Topic_clus$theta[,1], type="l")
 plot(Topic_clus$theta[,2], type="l")
 ```
 
-## ordtpx (K=3) [medium smoothness]
+## ordtpx (K=3)- smash
 
 ```{r echo=TRUE, eval=TRUE}
-library(ordtpx)
-levels <- ceiling(log(dim(ordered_counts)[2])/log(2))+1;
 
-Topic_clus_list <- vector(mode = "list", length = 25)
-loglik_clus_list <- vector(mode = "list", length = 25)
-
-scale <- 2
-del_beta <- scale*(10^{1:(levels-1)})
-Topic_clus <- ordtpx::ord_topics(ordered_counts, K=3, ztree_options=1, tol=0.1,
-                         init_method = "taddy", adapt.method="smash")
+Topic_clus <- ord_topics(ordered_counts, K=3, ztree_options=1, tol=0.1,
+                         init_method = "taddy", adapt.method="smash",
+                         burn_trials = 1, tmax_start = 2)
 Topic_clus$loglik
-theta <- Topic_clus$theta
-omega <- Topic_clus$omega
-probs <- omega %*% t(theta)
-loglik <- Reduce(sum, sapply(1:NROW(data), function(i) {
-            dmultinom(x = ordered_counts[i,], prob = probs[i,1:305], log = TRUE)
-        }) )
-
-loglik <- loglik - (10^4)*sum((theta[2:dim(theta)[1],] - theta[1:(dim(theta)[1]-1)])^2)
-loglik
-Topic_clus_list[[scale]] <- Topic_clus
-loglik_clus_list[[scale]] <- loglik;
 #print(scale)
 ```
 
-### Structure Plot
+### Structure Plot - by East-west and elevation
 
 ```{r echo=TRUE, eval=TRUE}
 par(mfrow=c(1,1))
@@ -147,6 +127,8 @@ index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
   abline(v=match_labs[2:length(match_labs)]);
 ```
 
+### Structure plot - by elevation
+
 ```{r echo=TRUE, eval=TRUE}
 K <- 3
 par(mfrow=c(1,1))
@@ -168,6 +150,110 @@ abline(v=match_labs[2:length(match_labs)]);
 ### Cluster plots
 
 ```{r echo=TRUE, eval=TRUE}
+par(mfrow=c(1,3))
+plot(Topic_clus$theta[1:305,1], type="l")
+plot(Topic_clus$theta[1:305,2], type="l")
+plot(Topic_clus$theta[1:305,3], type="l")
+
+```
+
+
+
+```{r echo=FALSE, eval=FALSE}
+library(ordtpx)
+levels <- ceiling(log(dim(ordered_counts)[2])/log(2))+1;
+
+scale <- 2
+del_beta <- scale*(10^{1:(levels-1)})
+Topic_clus <- ord_topics(ordered_counts, K=2, ztree_options=1, tol=0.1,
+                         init_method = "taddy", adapt.method="bash",
+                         burn_trials = 10, tmax_start = 2)
+Topic_clus$loglik
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+K <- 2
+par(mfrow=c(1,1))
+barplot(t(Topic_clus$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+par(mfrow=c(1,2))
+plot(Topic_clus$theta[,1], type="l")
+plot(Topic_clus$theta[,2], type="l")
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+
+Topic_clus <- ord_topics(ordered_counts, K=3, ztree_options=1, tol=0.1,
+                         init_method = "taddy", adapt.method="bash",
+                         burn_trials = 1, tmax_start = 2)
+Topic_clus$loglik
+#print(scale)
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+par(mfrow=c(1,1))
+docweights <- Topic_clus$omega
+east_west_elevation = paste0(metadata$WorE, "_", metadata$Elevation);
+
+index1 <- which(metadata$WorE=="E");
+index2 <- which(metadata$WorE=="W");
+elevation1 <- metadata$Elevation[index1]; elevation2 <- metadata$Elevation[index2];
+index_WE <- c(index1[order(elevation1)], index2[order(elevation2)]);
+
+  K <- 3
+    barplot(t(docweights[index_WE,]),col=2:(K+1),axisnames=F,space=0,border=NA,main=paste("No. of clusters=",3),las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4)
+
+    combo_patch_dir = paste0(east_west_elevation);
+    combo_patch_dir_ordered = combo_patch_dir[index_WE];
+
+  match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+  match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+  match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+  labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+
+  axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+  abline(v=match_labs[2:length(match_labs)]);
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+K <- 3
+par(mfrow=c(1,1))
+barplot(t(Topic_clus$omega[order(elevation_metadata),]),col=2:(K+1),axisnames=F,space=0,border=NA,main="",las=1,ylim=c(0,1),cex.axis=1.5,cex.main=1.4, xlab="elevation")
+title(main=paste("Structure Plot topic proportions,k=",K))
+combo_patch_dir = paste0(round(elevation_metadata));
+combo_patch_dir_ordered = combo_patch_dir[order(elevation_metadata)];
+
+match_labs=match(unique(combo_patch_dir_ordered),combo_patch_dir_ordered);
+match_labs_suffix=c(match_labs[2:length(unique(combo_patch_dir_ordered))],35);
+match_labs_prefix=match_labs[1:(length(unique(combo_patch_dir_ordered)))];
+labs=match_labs_prefix + 0.5*(match_labs_suffix - match_labs_prefix);
+
+axis(1,at=labs,unique(combo_patch_dir_ordered),las=2);
+abline(v=match_labs[2:length(match_labs)]);
+
+```
+
+
+```{r echo=FALSE, eval=FALSE}
 par(mfrow=c(1,3))
 plot(Topic_clus$theta[1:305,1], type="l")
 plot(Topic_clus$theta[1:305,2], type="l")
